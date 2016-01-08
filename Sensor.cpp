@@ -212,7 +212,6 @@ public:
 		);
 	}
 };
-
 // SendSignalŒü‚¯ŠÖ”ƒ|ƒCƒ“ƒ^.
 typedef void (SensorBus::*SendSignalPtr)(bool);
 
