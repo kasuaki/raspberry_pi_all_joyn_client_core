@@ -38,16 +38,6 @@
 #error No OS GROUP defined.
 #endif
 
-/**
- * Platform-independent assertion macro. If this is not defined in the
- * platform-specific header file or by other preprocessor define, it defaults
- * to assert.
- */
-#ifndef QCC_ASSERT
-#include <assert.h>
-#define QCC_ASSERT(expr) assert(expr)
-#endif
-
 #if defined(__GNUC__)
 
 #define GCC_VERSION ((__GNUC__ * 10000) + (__GNUC_MINOR__ * 100) + __GNUC_PATCHLEVEL__)
@@ -72,23 +62,19 @@
 
 #if (__GNUC__ >= 4) || ((__GNUC__ == 3) && (__GNUC_MINOR__ >= 1))
 #define QCC_DEPRECATED(func) func __attribute__((deprecated)) /**< mark a function as deprecated in gcc. */
-#define QCC_DEPRECATED_CLASS __attribute__((deprecated)) /**< mark a class as deprecated in qcc. */
 #else
 #define QCC_DEPRECATED(func) func /**< not all gcc versions support the deprecated attribute. */
-#define QCC_DEPRECATED_CLASS /**< not all gcc versions support the deprecated attribute. */
 #endif
 
 
 #elif defined(_MSC_VER)
 
 #define QCC_DEPRECATED(func) __declspec(deprecated) func /**< mark a function as deprecated in msvc. */
-#define QCC_DEPRECATED_CLASS __declspec(deprecated) /**< mark a class as deprecated in msvc. */
 
 
 #else /* Some unknown compiler */
 
 #define QCC_DEPRECATED(func); /**< mark a function as deprecated. */
-#define QCC_DEPRECATED_CLASS /**< mark a class as deprecated. */
 
 #endif /* Compiler type */
 

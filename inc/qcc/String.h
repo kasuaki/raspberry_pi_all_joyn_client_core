@@ -508,7 +508,7 @@ class String {
     static const size_t MinCapacity = 16;
 
     typedef struct {
-        volatile int32_t refCount; /**< The reference count of the context */
+        int32_t refCount;        /**< The reference count of the context */
         uint32_t offset;         /**< The offset of the end of the string */
         uint32_t capacity;       /**< The size of the string buffer */
         char c_str[MinCapacity]; /**< The buffer holding the actual character string */
@@ -520,7 +520,7 @@ class String {
 
     void IncRef();
 
-    void DecRef(ManagedCtx* ctx);
+    void DecRef(ManagedCtx* context);
 
     void NewContext(const char* str, size_t strLen, size_t sizeHint);
 };

@@ -25,8 +25,6 @@
 #error Only include BusAttachment.h in C++ code.
 #endif
 
-#include <set>
-
 #include <qcc/platform.h>
 
 #include <qcc/String.h>
@@ -43,10 +41,6 @@
 #include <alljoyn/SessionPortListener.h>
 #include <alljoyn/Status.h>
 #include <alljoyn/Translator.h>
-#include <alljoyn/ApplicationStateListener.h>
-#include <alljoyn/PermissionPolicy.h>
-#include <alljoyn/PermissionConfigurator.h>
-#include <alljoyn/PermissionConfigurationListener.h>
 
 namespace ajn {
 
@@ -160,41 +154,6 @@ class BusAttachment : public MessageReceiver {
     };
 
     /**
-     * Pure virtual base class implemented by classes that wish to call AddMatchAsync().
-     */
-    class AddMatchAsyncCB {
-      public:
-        /** Destructor */
-        virtual ~AddMatchAsyncCB() { }
-
-        /**
-         * Called when AddMatchAsyncCB() completes.
-         *
-         * @param status        ER_OK if successful
-         * @param context       User defined context which will be passed as-is to callback.
-         */
-        virtual void AddMatchCB(QStatus status, void* context) = 0;
-    };
-
-
-    /**
-     * Pure virtual base class implemented by classes that wish to call RemoveMatchAsync().
-     */
-    class RemoveMatchAsyncCB {
-      public:
-        /** Destructor */
-        virtual ~RemoveMatchAsyncCB() { }
-
-        /**
-         * Called when RemoveMatchAsyncCB() completes.
-         *
-         * @param status        ER_OK if successful
-         * @param context       User defined context which will be passed as-is to callback.
-         */
-        virtual void RemoveMatchCB(QStatus status, void* context) = 0;
-    };
-
-    /**
      * Construct a BusAttachment.
      *
      * @param applicationName       Name of the application.
@@ -223,33 +182,6 @@ class BusAttachment : public MessageReceiver {
     /**
      * Allow the currently executing method/signal handler to enable concurrent callbacks
      * during the scope of the handler's execution.
-     *
-     * This member function can ONLY be called from within the body of a signal
-     * handler, method handler or other AllJoyn callback. It allows AllJoyn to
-     * dispatch a single (additional) callback while the current one is still
-     * executing. This method is typically used when a method, signal handler or
-     * other AllJoyn callback needs to execute for a long period of time or when
-     * the callback needs to make any kind of blocking call.
-     *
-     * This method MUST be called prior to making any non-asynchronous AllJoyn
-     * remote procedure calls from within an AllJoyn callback. This includes
-     * calls such as JoinSession(), AdvertiseName(), CancelAdvertisedName(),
-     * FindAdvertisedName(), CancelFindAdvertisedName(), SetLinkTimeout(), etc.
-     *
-     * EnableConcurrentCallbacks doesn't take effect when a BusAttachment is
-     * created with just one thread. If the BusAttachment is created with just
-     * one thread, i.e. `ajn::BusAttachment busAttachment(appName, true, 1)` and
-     * the application developer attempts to make a blocking method call in a
-     * callback after invoking EnableConcurrentCallbacks(), the application will
-     * deadlock.
-     *
-     * For the same reason that EnableConcurrentCallbacks cannot be used with
-     * just one thread, the maximum number of concurrent callbacks is limited
-     * to the value specified when creating the BusAttachment. If no concurrency
-     * value was chosen the default is 4. It is the application developers
-     * responsibility to make sure the maximum number of concurrent callbacks is
-     * not exceeded. If the maximum number is exceeded the application will
-     * deadlock.
      */
     void EnableConcurrentCallbacks();
 
@@ -560,7 +492,7 @@ class BusAttachment : public MessageReceiver {
      * will be ignored and the bundled router connectSpec will be used.  Use
      * Disconnect() instead which will use correct connectSpec.
      *
-     * @param disconnectConnectSpec  The transport connection spec used to connect.
+     * @param connectSpec  The transport connection spec used to connect.
      *
      * @return
      *          - #ER_OK if successful
@@ -568,7 +500,7 @@ class BusAttachment : public MessageReceiver {
      *          - #ER_BUS_NOT_CONNECTED if the %BusAttachment is not connected to the bus
      *          - Other error status codes indicating a failure
      */
-    QCC_DEPRECATED(QStatus Disconnect(const char* disconnectConnectSpec));
+    QCC_DEPRECATED(QStatus Disconnect(const char* connectSpec));
 
     /**
      * %Disconnect the %BusAttachment from the remote bus.
@@ -796,36 +728,36 @@ class BusAttachment : public MessageReceiver {
      * own key store implementation it must have already called RegisterKeyStoreListener() before
      * calling this function.
      *
-     * This method can be called multiple times with different auth mechanisms.
+     * Once peer security has been enabled it is not possible to change the authMechanism set without
+     * clearing it first (setting authMechanism to NULL). This is true regardless of whether the BusAttachment
+     * has been disconnected or not.
      *
-     * @param authMechanisms       The authentication mechanism(s) to use for peer-to-peer authentication.
-     *                             If this parameter is NULL peer-to-peer authentication is disabled.  This is a
-     *                             space separated list of any of the following values:
-     *                             ALLJOYN_SRP_LOGON, ALLJOYN_SRP_KEYX, ALLJOYN_ECDHE_NULL, ALLJOYN_ECDHE_PSK,
-     *                             ALLJOYN_ECDHE_ECDSA, GSSAPI.
+     * @param authMechanisms   The authentication mechanism(s) to use for peer-to-peer authentication.
+     *                         If this parameter is NULL peer-to-peer authentication is disabled.  This is a
+     *                         space separated list of any of the following values:
+     *                         ALLJOYN_SRP_LOGON, ALLJOYN_SRP_KEYX, ALLJOYN_ECDHE_NULL, ALLJOYN_ECDHE_PSK,
+     *                         ALLJOYN_ECDHE_ECDSA, GSSAPI.
      *
-     * @param authListener         Passes password and other authentication related requests to the application.
+     * @param listener         Passes password and other authentication related requests to the application.
      *
-     * @param keyStoreFileName     Optional parameter to specify the filename of the default key store. The
-     *                             default value is the applicationName parameter of BusAttachment().
-     *                             Note that this parameter is only meaningful when using the default
-     *                             key store implementation.
+     * @param keyStoreFileName Optional parameter to specify the filename of the default key store. The
+     *                         default value is the applicationName parameter of BusAttachment().
+     *                         Note that this parameter is only meaningful when using the default
+     *                         key store implementation.
      *
-     * @param isShared             optional parameter that indicates if the key store is shared between multiple
-     *                             applications. It is generally harmless to set this to true even when the
-     *                             key store is not shared but it adds some unnecessary calls to the key store
-     *                             listener to load and store the key store in this case.
-     * @param permissionConfigurationListener   Passes security 2.0 callbacks to the application.
+     * @param isShared         optional parameter that indicates if the key store is shared between multiple
+     *                         applications. It is generally harmless to set this to true even when the
+     *                         key store is not shared but it adds some unnecessary calls to the key store
+     *                         listener to load and store the key store in this case.
      *
      * @return
      *      - #ER_OK if peer security was enabled.
      *      - #ER_BUS_BUS_NOT_STARTED BusAttachment::Start has not be called
      */
     QStatus EnablePeerSecurity(const char* authMechanisms,
-                               AuthListener* authListener,
+                               AuthListener* listener,
                                const char* keyStoreFileName = NULL,
-                               bool isShared = false,
-                               PermissionConfigurationListener* permissionConfigurationListener = NULL);
+                               bool isShared = false);
 
     /**
      * Check is peer security has been enabled for this bus attachment.
@@ -833,6 +765,7 @@ class BusAttachment : public MessageReceiver {
      * @return   Returns true if peer security has been enabled, false otherwise.
      */
     bool IsPeerSecurityEnabled();
+
 
     /**
      * Register an object that will receive bus event notifications.
@@ -994,24 +927,6 @@ class BusAttachment : public MessageReceiver {
     QStatus AddMatch(const char* rule);
 
     /**
-     * Add a DBus match rule asynchronously.
-     *
-     * This method is a shortcut/helper that issues an org.freedesktop.DBus.AddMatch method call to the local router.
-     *
-     * @param[in]  rule     Match rule to be added (see DBus specification for format of this string).
-     * @param[in]  callback The object to be called when AddMatchAsync completes.
-     * @param[in]  context  User-defined context that will be returned to the reply handler
-     *
-     * @return
-     *      - #ER_OK if the AddMatch request was successful.
-     *      - #ER_BUS_NOT_CONNECTED if a connection has not been made with a local bus.
-     *      - Other error status codes indicating a failure.
-     */
-    QStatus AddMatchAsync(const char* rule,
-                          AddMatchAsyncCB* callback,
-                          void* context = NULL);
-
-    /**
      * Remove a DBus match rule.
      * This method is a shortcut/helper that issues an org.freedesktop.DBus.RemoveMatch method call to the local router.
      *
@@ -1023,23 +938,6 @@ class BusAttachment : public MessageReceiver {
      *      - Other error status codes indicating a failure.
      */
     QStatus RemoveMatch(const char* rule);
-
-    /**
-     * Remove a DBus match rule.
-     * This method is a shortcut/helper that issues an org.freedesktop.DBus.RemoveMatch method call to the local router.
-     *
-     * @param[in]  rule     Match rule to be removed (see DBus specification for format of this string).
-     * @param[in]  callback The object to be called when RemoveMatchAsync completes.
-     * @param[in]  context  User-defined context that will be returned to the reply handler
-     *
-     * @return
-     *      - #ER_OK if the RemoveMatch request was successful.
-     *      - #ER_BUS_NOT_CONNECTED if a connection has not been made with a local bus.
-     *      - Other error status codes indicating a failure.
-     */
-    QStatus RemoveMatchAsync(const char* rule,
-                             RemoveMatchAsyncCB* callback,
-                             void* context = NULL);
 
     /**
      * Add a DBus match rule.
@@ -1508,50 +1406,6 @@ class BusAttachment : public MessageReceiver {
                                 void* context = NULL);
 
     /**
-     * Explicitly secure the connection to the remote peer. Peer-to-peer
-     * connections can only be secured if EnablePeerSecurity() was previously called on the bus
-     * attachment. If the peer-to-peer connection is already secure this
-     * function does nothing. Note that peer-to-peer connections are automatically secured when a
-     * method call requiring encryption is sent.
-     *
-     * This call causes messages to be sent on the bus, therefore it cannot be called within AllJoyn
-     * callbacks (method/signal/reply handlers or ObjectRegistered callbacks, etc.)
-     *
-     * @param[in]  name       The unique name of the remote peer or NULL to secure the connections to all peers
-     *                        this BusAttachment is in session with.
-     * @param[in]  forceAuth  If true, forces re-authentication even if the peer connection is already
-     *                        authenticated.
-     *
-     * @return
-     *          - #ER_OK if the connection was secured or an error status indicating that the
-     *            connection could not be secured.
-     *          - #ER_BUS_NO_AUTHENTICATION_MECHANISM if BusAttachment::EnablePeerSecurity() has not been called.
-     *          - #ER_AUTH_FAIL if the attempt(s) to authenticate the peer failed.
-     *          - Other error status codes indicating a failure.
-     */
-    QStatus SecureConnection(const char* name, bool forceAuth = false);
-
-    /**
-     * Asynchronously secure the connection to the remote peer. Peer-to-peer connections can only
-     * be secured if EnablePeerSecurity() was previously called on the bus attachment.
-     * If the peer-to-peer connection is already secure this function does nothing.
-     * Note that peer-to-peer connections are automatically secured when a
-     * method call requiring encryption is sent.
-     *
-     * Notification of success or failure is via the AuthListener passed to EnablePeerSecurity().
-     *
-     * @param[in]  name      The unique name of the remote peer or NULL to secure the connections to all peers
-     *                       this BusAttachment is in session with.
-     * @param[in] forceAuth  If true, forces re-authentication even if the peer connection is already
-     *                       authenticated.
-     * @return
-     *          - #ER_OK if securing could begin.
-     *          - #ER_BUS_NO_AUTHENTICATION_MECHANISM if BusAttachment::EnablePeerSecurity() has not been called.
-     *          - Other error status codes indicating a failure.
-     */
-    QStatus SecureConnectionAsync(const char* name, bool forceAuth = false);
-
-    /**
      * Determine whether a given well-known name exists on the bus.
      * This method is a shortcut/helper that issues an org.freedesktop.DBus.NameHasOwner method call to the router
      * and interprets the response.
@@ -1680,9 +1534,9 @@ class BusAttachment : public MessageReceiver {
 
     /**
      * Set a Translator for all BusObjects and InterfaceDescriptions. This Translator is used for
-     * descriptions appearing in introspection, and localizable text in about data. Note that any Translators
-     * set on a specific InterfaceDescription or BusObject will be used for those specific elements - this
-     * Translator is used only for BusObjects and InterfaceDescriptions that do not have Translators set for them.
+     * descriptions appearing in introspection. Note that any Translators set on a specific
+     * InterfaceDescription or BusObject will be used for those specific elements - this Translator
+     * is used only for BusObjects and InterfaceDescriptions that do not have Translators set for them.
      *
      * @param[in]  translator       The Translator instance
      */
@@ -1694,13 +1548,6 @@ class BusAttachment : public MessageReceiver {
      * @return This BusAttachment's Translator
      */
     Translator* GetDescriptionTranslator();
-
-    /**
-     * Get the permission configurator for the bus attachment.
-     * @return the permission configurator
-     */
-
-    PermissionConfigurator& GetPermissionConfigurator();
 
     /**
      * Registers a handler to receive the org.alljoyn.about Announce signal.
@@ -1715,7 +1562,7 @@ class BusAttachment : public MessageReceiver {
     void RegisterAboutListener(AboutListener& aboutListener);
 
     /**
-     * Unregisters the handler from receiving the org.alljoyn.about Announce signal.
+     * Unregisters the AnnounceHandler from receiving the org.alljoyn.about Announce signal.
      *
      * @param[in] aboutListener reference to AboutListener to unregister
      */
@@ -1900,50 +1747,6 @@ class BusAttachment : public MessageReceiver {
      */
     QStatus CancelWhoImplementsNonBlocking(const char* iface);
 
-    /**
-     * Registers a handler to receive the org.alljoyn.Bus.Application
-     * State signal.
-     *
-     * @param[in] applicationStateListener reference to an ApplicationStateListener
-     */
-    void RegisterApplicationStateListener(ApplicationStateListener& applicationStateListener);
-
-    /**
-     * Unregisters the ApplicationStateListener from receiving the
-     * org.alljoyn.Bus.Application State signal.
-     *
-     * @param[in] applicationStateListener reference to an
-     *                                     ApplicationStateListener to
-     *                                     unregister
-     */
-    void UnregisterApplicationStateListener(ApplicationStateListener& applicationStateListener);
-
-    /**
-     * This is a helper function that will add the match rule responsible for
-     * receiving the org.alljoyn.Bus.Application State signal.
-     *
-     * The ApplicationStateListener should be registered before calling this method.
-     *
-     * This will only call AddMatch for the State signal.
-     *
-     * @return
-     *    - #ER_OK on success
-     *    - An error status otherwise
-     */
-    QStatus AddApplicationStateRule();
-
-    /**
-     * This is a helper function that will remove the match rule responsible for
-     * receiving the org.alljoyn.Bus.Application State signal.
-     *
-     * This will only call RemoveMatch for the State signal.
-     *
-     * @return
-     *    - #ER_OK on success
-     *    - An error status otherwise
-     */
-    QStatus RemoveApplicationStateRule();
-
     /// @cond ALLJOYN_DEV
     /**
      * @internal
@@ -2067,9 +1870,14 @@ class BusAttachment : public MessageReceiver {
     QStatus LeaveSession(const SessionId& sessionId, const char*method, SessionSideMask bitset);
 
     /**
-     * Clear session bookkeeping for a particular session
+     * Clear session listeners for a particular session
      */
-    void ClearSession(SessionId sessionId, SessionSideMask bitset);
+    void ClearSessionListener(SessionId sessionId, SessionSideMask bitset);
+
+    /**
+     * Remove references to session
+     */
+    void ClearSessionSet(SessionId sessionId, SessionSideMask bitset);
 
     /**
      * Register signal handlers for BusListener
@@ -2080,11 +1888,6 @@ class BusAttachment : public MessageReceiver {
      * Unregister signal handlers for BusListener
      */
     void UnregisterSignalHandlers();
-
-    /**
-     * Common logic for securing a connection. Called by SecureConnection and SecureConnectionAsync.
-     */
-    QStatus SecureConnectionInternal(const char* name, bool forceAuth, bool async);
 
     qcc::String connectSpec;  /**< The connect spec used to connect to the bus */
     bool isStarted;           /**< Indicates if the bus has been started */
@@ -2132,7 +1935,7 @@ class BusAttachment : public MessageReceiver {
         BusAttachment* bus;
     };
 
-    Translator* translator;       /**< Global translator for localizable text */
+    Translator* translator;       /**< Global translator for descriptions */
 
     JoinObj joinObj;          /**< MUST BE LAST MEMBER. Ensure all threads are joined before BusAttachment destruction */
 

@@ -1,25 +1,5 @@
-/**
- * @file
- * @brief  Sample implementation of an AllJoyn client.
- */
+#include <wiringPi.h>
 
-/******************************************************************************
- *
- *
- * Copyright AllSeen Alliance. All rights reserved.
- *
- *    Permission to use, copy, modify, and/or distribute this software for any
- *    purpose with or without fee is hereby granted, provided that the above
- *    copyright notice and this permission notice appear in all copies.
- *
- *    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- *    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- *    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- *    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- *    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- *    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- ******************************************************************************/
 #include <qcc/platform.h>
 
 #include <signal.h>
@@ -38,249 +18,261 @@ using namespace std;
 using namespace qcc;
 using namespace ajn;
 
-/** Static top level message bus object */
-static BusAttachment* g_msgBus = NULL;
-
-/*constants*/
-static const char* INTERFACE_NAME = "org.alljoyn.Bus.sample";
-static const char* SERVICE_NAME = "org.alljoyn.Bus.sample";
-static const char* SERVICE_PATH = "/sample";
-static const SessionPort SERVICE_PORT = 25;
-
-static bool s_joinComplete = false;
-static String s_sessionHost;
-static SessionId s_sessionId = 0;
-
-static volatile sig_atomic_t s_interrupt = false;
+// ループ用.
+static volatile sig_atomic_t sigFlag = false;
 
 static void CDECL_CALL SigIntHandler(int sig)
 {
-    QCC_UNUSED(sig);
-    s_interrupt = true;
+	QCC_UNUSED(sig);
+	sigFlag = true;
 }
 
-/** AllJoynListener receives discovery events from AllJoyn */
-class MyBusListener : public BusListener, public SessionListener {
+static const char* INTERFACE_NAME = "org.alljoyn.SensorLightCamera.Sensor";
+static const char* SERVICE_NAME = "org.alljoyn.SensorLightCamera";
+static const char* SERVICE_PATH = "/";
+static const SessionPort SERVICE_PORT = 25;
+
+class MyBusObject : public BusObject {
+  private:
+	bool senseProp;
   public:
-    void FoundAdvertisedName(const char* name, TransportMask transport, const char* namePrefix)
-    {
-        if (0 == strcmp(name, SERVICE_NAME) && s_sessionHost.empty()) {
-            printf("FoundAdvertisedName(name='%s', transport = 0x%x, prefix='%s')\n", name, transport, namePrefix);
+	MyBusObject(const char* path, InterfaceDescription* _intf) :
+		BusObject(path),
+		senseProp(false)
+	{
+		AddInterface(*_intf);
+	}
 
-            /* We found a remote bus that is advertising basic service's well-known name so connect to it. */
-            /* Since we are in a callback we must enable concurrent callbacks before calling a synchronous method. */
-            s_sessionHost = name;
-            g_msgBus->EnableConcurrentCallbacks();
-            SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, false, SessionOpts::PROXIMITY_ANY, TRANSPORT_ANY);
-            QStatus status = g_msgBus->JoinSession(name, SERVICE_PORT, this, s_sessionId, opts);
-            if (ER_OK == status) {
-                printf("JoinSession SUCCESS (Session id=%d).\n", s_sessionId);
-            } else {
-                printf("JoinSession failed (status=%s).\n", QCC_StatusText(status));
-            }
-            s_joinComplete = true;
-        }
-    }
+	void SetSenseProp(bool _senseProp)
+	{
+		senseProp = _senseProp;
+	}
 
-    void NameOwnerChanged(const char* busName, const char* previousOwner, const char* newOwner)
-    {
-        if (newOwner && (0 == strcmp(busName, SERVICE_NAME))) {
-            printf("NameOwnerChanged: name='%s', oldOwner='%s', newOwner='%s'.\n",
-                   busName,
-                   previousOwner ? previousOwner : "<none>",
-                   newOwner ? newOwner : "<none>");
-        }
-    }
+	QStatus Get(const char* ifcName, const char* propName, MsgArg& val)
+	{
+		QCC_UNUSED(ifcName);
+
+		QStatus status = ER_OK;
+
+		if (0 == strcmp("sense", propName)) {
+
+			val.typeId = ALLJOYN_BOOLEAN;
+			val.v_bool = senseProp;
+
+		} else {
+
+			status = ER_BUS_NO_SUCH_PROPERTY;
+		}
+
+		return status;
+	}
 };
 
-/** Create the interface, report the result to stdout, and return the result status. */
-QStatus CreateInterface(void)
+class MyBusListener : public BusListener, public SessionPortListener {
+private:
+	BusAttachment* busAtt;
+	String sessionHost;
+public:
+	MyBusListener(BusAttachment* _busAtt)
+	{
+		busAtt = _busAtt;
+	}
+
+	void NameOwnerChanged(const char* busName, const char* previousOwner, const char* newOwner)
+	{
+		if (newOwner && (0 == strcmp(busName, SERVICE_NAME))) {
+			printf("NameOwnerChanged: name=%s, oldOwner=%s, newOwner=%s.\n",
+				   busName,
+				   previousOwner ? previousOwner : "<none>",
+				   newOwner ? newOwner : "<none>");
+		}
+	}
+	bool AcceptSessionJoiner(SessionPort sessionPort, const char* joiner, const SessionOpts& opts)
+	{
+		if (sessionPort != SERVICE_PORT) {
+			printf("Rejecting join attempt on unexpected session port %d.\n", sessionPort);
+			return false;
+		}
+		printf("Accepting join session request from %s (opts.proximity=%x, opts.traffic=%x, opts.transports=%x).\n",
+			   joiner, opts.proximity, opts.traffic, opts.transports);
+		return true;
+	}
+	void FoundAdvertisedName(const char* name, TransportMask transport, const char* namePrefix)
+	{
+		BusListener::FoundAdvertisedName(name, transport, namePrefix);
+	}
+	void LostAdvertisedName(const char* name, TransportMask transport, const char* namePrefix)
+	{
+		BusListener::LostAdvertisedName(name, transport, namePrefix);
+	}
+	void ListenerRegistered(BusAttachment* bus)
+	{
+		BusListener::ListenerRegistered(bus);
+	}
+	void ListenerUnregistered()
+	{
+		BusListener::ListenerUnregistered();
+	}
+	void BusStopping()
+	{
+		BusListener::BusStopping();
+	}
+	void BusDisconnected()
+	{
+		BusListener::BusDisconnected();
+	}
+	void SessionJoined(SessionPort sessionPort, SessionId id, const char* joiner)
+	{
+		SessionPortListener::SessionJoined(sessionPort, id, joiner);
+	}
+};
+
+class SensorBus
 {
-    /* Add org.alljoyn.Bus.method_sample interface */
-    InterfaceDescription* testIntf = NULL;
-    QStatus status = g_msgBus->CreateInterface(INTERFACE_NAME, testIntf);
+private:
+	BusAttachment* busAtt = NULL;
+	MyBusObject* busObj = NULL;
+	MyBusListener* busListener = NULL;
+	const InterfaceDescription::Member* sensed = NULL;
 
-    if (status == ER_OK) {
-        printf("Interface '%s' created.\n", INTERFACE_NAME);
-        testIntf->AddMethod("cat", "ss",  "s", "inStr1,inStr2,outStr", 0);
-        testIntf->Activate();
-    } else {
-        printf("Failed to create interface '%s'.\n", INTERFACE_NAME);
-    }
+	InterfaceDescription* createInterfaceDescription(BusAttachment* _busAtt)
+	{
+		InterfaceDescription* intf = NULL;
+		_busAtt->CreateInterface(INTERFACE_NAME, intf);
 
-    return status;
-}
+		intf->AddSignal("sensed", "b", "sense", 0);
+		intf->AddProperty("sense", "b", PROP_ACCESS_READ);
 
-/** Start the message bus, report the result to stdout, and return the result status. */
-QStatus StartMessageBus(void)
+		intf->Activate();
+
+		sensed = intf->GetSignal("sensed");
+
+		return intf;
+	}
+public:
+	SensorBus()
+	{
+		AllJoynInit();
+		//AllJoynRouterInit();
+
+		printf("AllJoyn Library version: %s.\n", ajn::GetVersion());
+
+		busAtt = new BusAttachment("Sensor", true);
+
+		busListener = new MyBusListener(busAtt);
+		busAtt->RegisterBusListener(*busListener);
+
+		busAtt->Start();
+
+		InterfaceDescription* intf = createInterfaceDescription(busAtt);
+
+		busObj = new MyBusObject(SERVICE_PATH, intf);
+		busAtt->RegisterBusObject(*busObj);
+
+		busAtt->Connect();
+
+		busAtt->RequestName(SERVICE_NAME, (DBUS_NAME_FLAG_REPLACE_EXISTING | DBUS_NAME_FLAG_DO_NOT_QUEUE));
+
+		SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, false, SessionOpts::PROXIMITY_ANY, TRANSPORT_ANY);
+		SessionPort sp = SERVICE_PORT;
+		busAtt->BindSessionPort(sp, opts, *busListener);
+
+		busAtt->AdvertiseName(SERVICE_NAME, TRANSPORT_ANY);
+	}
+
+	~SensorBus()
+	{
+		delete busAtt;
+		busAtt = NULL;
+		delete busObj;
+		busObj = NULL;
+		delete busListener;
+		busListener = NULL;
+
+		//AllJoynRouterShutdown();
+		AllJoynShutdown();
+	}
+
+	void SendSignal(bool ret)
+	{
+		busObj->SetSenseProp(ret);
+
+		MsgArg* arg = new MsgArg(ALLJOYN_BOOLEAN);
+		arg->v_bool = ret;
+
+		printf("Send Signal(%d)\n", ret);
+
+		busObj->Signal(NULL,							// NULL for broadcast signals.
+						0,								// For broadcast or sessionless signals, the sessionId must be 0.
+						*sensed,						// Interface member of signal being emitted.
+						arg, 							// The arguments for the signal (can be NULL).
+						1, 								// The number of arguments.
+						0, 								// timeToLive.
+						ALLJOYN_FLAG_GLOBAL_BROADCAST	// broadcast signal (null destination) will be forwarded to all Routing Nodes in the system.
+		);
+	}
+};
+
+// SendSignal向け関数ポインタ.
+typedef void (SensorBus::*SendSignalPtr)(bool);
+
+class HumanSensor
 {
-    QStatus status = g_msgBus->Start();
+private:
+	const int pin_22 = 6;	   // rsp board pin:22
 
-    if (ER_OK == status) {
-        printf("BusAttachment started.\n");
-    } else {
-        printf("BusAttachment::Start failed.\n");
-    }
+	// SensorBusに処理委譲.
+	SensorBus* bus;
+	SendSignalPtr fp;
 
-    return status;
-}
+	// 静的からローカルに変更.
+	static HumanSensor* thisPtr;
+	static void staticSig()
+	{
+		thisPtr->sig();
+	}
+	void sig()
+	{
+		printf("sig: %d \n", digitalRead(pin_22));
+		(bus->*fp)(digitalRead(pin_22));
+	}
+public:
+	HumanSensor(SendSignalPtr _fp, SensorBus* _bus) :
+	bus(_bus), fp(_fp)
+	{
+		thisPtr = this;
 
-/** Handle the connection to the bus, report the result to stdout, and return the result status. */
-QStatus ConnectToBus(void)
-{
-    QStatus status = g_msgBus->Connect();
+		wiringPiSetup();
 
-    if (ER_OK == status) {
-        printf("BusAttachment connected to '%s'.\n", g_msgBus->GetConnectSpec().c_str());
-    } else {
-        printf("BusAttachment::Connect('%s') failed.\n", g_msgBus->GetConnectSpec().c_str());
-    }
+		pinMode(pin_22, INPUT);
+		pullUpDnControl(pin_22, PUD_UP);
+		wiringPiISR(pin_22, INT_EDGE_BOTH, &HumanSensor::staticSig);
+	}
+	~HumanSensor()
+	{
+	}
+};
+HumanSensor* HumanSensor::thisPtr;
 
-    return status;
-}
-
-/** Register a bus listener in order to get discovery indications and report the event to stdout. */
-void RegisterBusListener(void)
-{
-    /* Static bus listener */
-    static MyBusListener s_busListener;
-
-    g_msgBus->RegisterBusListener(s_busListener);
-    printf("BusListener Registered.\n");
-}
-
-/** Begin discovery on the well-known name of the service to be called, report the result to
-   stdout, and return the result status. */
-QStatus FindAdvertisedName(void)
-{
-    /* Begin discovery on the well-known name of the service to be called */
-    QStatus status = g_msgBus->FindAdvertisedName(SERVICE_NAME);
-
-    if (status == ER_OK) {
-        printf("org.alljoyn.Bus.FindAdvertisedName ('%s') succeeded.\n", SERVICE_NAME);
-    } else {
-        printf("org.alljoyn.Bus.FindAdvertisedName ('%s') failed (%s).\n", SERVICE_NAME, QCC_StatusText(status));
-    }
-
-    return status;
-}
-
-/** Wait for join session to complete, report the event to stdout, and return the result status. */
-QStatus WaitForJoinSessionCompletion(void)
-{
-    unsigned int count = 0;
-
-    while (!s_joinComplete && !s_interrupt) {
-        if (0 == (count++ % 10)) {
-            printf("Waited %u seconds for JoinSession completion.\n", count / 10);
-        }
-
-#ifdef _WIN32
-        Sleep(100);
-#else
-        usleep(100 * 1000);
-#endif
-    }
-
-    return s_joinComplete && !s_interrupt ? ER_OK : ER_ALLJOYN_JOINSESSION_REPLY_CONNECT_FAILED;
-}
-
-/** Do a method call, report the result to stdout, and return the result status. */
-QStatus MakeMethodCall(void)
-{
-    ProxyBusObject remoteObj(*g_msgBus, SERVICE_NAME, SERVICE_PATH, s_sessionId);
-    const InterfaceDescription* alljoynTestIntf = g_msgBus->GetInterface(INTERFACE_NAME);
-
-    QCC_ASSERT(alljoynTestIntf);
-    remoteObj.AddInterface(*alljoynTestIntf);
-
-    Message reply(*g_msgBus);
-    MsgArg inputs[2];
-
-    inputs[0].Set("s", "Hello ");
-    inputs[1].Set("s", "World!");
-
-    QStatus status = remoteObj.MethodCall(INTERFACE_NAME, "cat", inputs, 2, reply, 5000);
-
-    if (ER_OK == status) {
-        printf("'%s.%s' (path='%s') returned '%s'.\n", SERVICE_NAME, "cat",
-               SERVICE_PATH, reply->GetArg(0)->v_string.str);
-    } else {
-        printf("MethodCall on '%s.%s' failed.", SERVICE_NAME, "cat");
-    }
-
-    return status;
-}
-
-/** Main entry point */
+// メイン処理.
 int CDECL_CALL main(int argc, char** argv, char** envArg)
 {
-    QCC_UNUSED(argc);
-    QCC_UNUSED(argv);
-    QCC_UNUSED(envArg);
+	QCC_UNUSED(argc);
+	QCC_UNUSED(argv);
+	QCC_UNUSED(envArg);
 
-    if (AllJoynInit() != ER_OK) {
-        return 1;
-    }
-#ifdef ROUTER
-    if (AllJoynRouterInit() != ER_OK) {
-        AllJoynShutdown();
-        return 1;
-    }
-#endif
+	SensorBus* bus = new SensorBus();
+	HumanSensor* sensor = new HumanSensor(&SensorBus::SendSignal, bus);
 
-    printf("AllJoyn Library version: %s.\n", ajn::GetVersion());
-    printf("AllJoyn Library build info: %s.\n", ajn::GetBuildInfo());
+	// ctrl-c受付.
+	signal(SIGINT, SigIntHandler);
 
-    /* Install SIGINT handler. */
-    signal(SIGINT, SigIntHandler);
+	while (sigFlag == false) {
+		usleep(100 * 1000);
+	}
 
-    QStatus status = ER_OK;
+	delete bus;
+	delete sensor;
 
-    /* Create message bus. */
-    g_msgBus = new BusAttachment("myApp", true);
-
-    /* This test for NULL is only required if new() behavior is to return NULL
-     * instead of throwing an exception upon an out of memory failure.
-     */
-    if (!g_msgBus) {
-        status = ER_OUT_OF_MEMORY;
-    }
-
-    if (ER_OK == status) {
-        status = CreateInterface();
-    }
-
-    if (ER_OK == status) {
-        status = StartMessageBus();
-    }
-
-    if (ER_OK == status) {
-        status = ConnectToBus();
-    }
-
-    if (ER_OK == status) {
-        RegisterBusListener();
-        status = FindAdvertisedName();
-    }
-
-    if (ER_OK == status) {
-        status = WaitForJoinSessionCompletion();
-    }
-
-    if (ER_OK == status) {
-        status = MakeMethodCall();
-    }
-
-    /* Deallocate bus */
-    delete g_msgBus;
-    g_msgBus = NULL;
-
-    printf("Basic client exiting with status 0x%04x (%s).\n", status, QCC_StatusText(status));
-
-#ifdef ROUTER
-    AllJoynRouterShutdown();
-#endif
-    AllJoynShutdown();
-    return (int) status;
+	return 0;
 }

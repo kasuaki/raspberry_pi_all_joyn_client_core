@@ -35,7 +35,7 @@
 
 /**
  * Some products using AllJoyn source code(e.g.Microsoft Windows) can override
- * this macro to direct the log output to their product-specific log.
+ * this macro to direct the log output to their product - specific log.
  */
 #ifndef QCC_LogError
 /**
@@ -60,30 +60,6 @@
         _QCC_DbgPrintProcess(_ctx, DBG_LOCAL_ERROR, QCC_MODULE, __FILE__, __LINE__); \
     } while (0)
 #endif
-#endif
-
-/**
- * Some products using AllJoyn source code(e.g.Microsoft Windows) can override
- * this macro to direct the log output to their product-specific log.
- */
-#ifndef QCC_LogMsg
-/**
- * Macro for printing a log message. This will print its message even when
- * NDEBUG is defined (depending on the log level setting).
- * This macro is only intended for use in test applications where the
- * timing of events needs to be record within an optimized build
- * (release mode)
- *
- * @param _msg      "printf" parameters in parentheses.
- *                  Example: ("value: %d", variable)
- */
-#define QCC_LogMsg(_msg)                                                \
-    do {                                                                \
-        if (_QCC_DbgPrintCheck((DBG_HIGH_LEVEL), QCC_MODULE)) {         \
-            void* _ctx = _QCC_DbgPrintContext _msg;                     \
-            _QCC_DbgPrintProcess(_ctx, DBG_HIGH_LEVEL, QCC_MODULE, __FILE__, __LINE__); \
-        } \
-    } while (0)
 #endif
 
 /**
@@ -154,7 +130,7 @@
  * Macro used to avoid the need for a local variable just for an assert. Using a local
  * variable just for assert, instead of this macro, can cause compiler warnings on
  * NDEBUG builds.
- * Example: QCC_VERIFY(foo() == 0); instead of {int local = foo(); QCC_ASSERT(local == 0);}
+ * Example: QCC_VERIFY(foo() == 0); instead of {int local = foo(); assert(local == 0);}
  *
  * @param _cmd  Statement to be executed on both types of builds, and asserted just
  *              on non-NDEBUG builds.
@@ -162,7 +138,7 @@
 #if defined(NDEBUG)
 #define QCC_VERIFY(_cmd) ((void)(_cmd))
 #else
-#define QCC_VERIFY(_cmd) QCC_ASSERT(_cmd)
+#define QCC_VERIFY(_cmd) assert(_cmd)
 #endif
 
 /**
@@ -270,7 +246,7 @@ typedef void (*QCC_DbgMsgCallback)(DbgMsgType type,
 
 
 /**
- * Allows the application to define its own debug and error message handler.
+ * Allows the application to define it's own debug and error message handler.
  * This is intended for more generic handling of debug messages than what
  * QCC_RegisterOutputFile() can provide.
  *

@@ -199,7 +199,7 @@ typedef enum {
     ER_BUS_IFACE_ALREADY_EXISTS = 0x903c /**< Attempt to add an interface to an object that already exists */,
     ER_BUS_ERROR_RESPONSE = 0x903d /**< Received an error response to a method call */,
     ER_BUS_BAD_XML = 0x903e /**< XML data is improperly formatted */,
-    ER_BUS_BAD_CHILD_PATH = 0x903f /**< The path of a child object is incorrect given its parent's path */,
+    ER_BUS_BAD_CHILD_PATH = 0x903f /**< The path of a child object is incorrect given it's parent's path */,
     ER_BUS_OBJ_ALREADY_EXISTS = 0x9040 /**< Attempt to add a RemoteObject child that already exists */,
     ER_BUS_OBJ_NOT_FOUND = 0x9041 /**< Object with given path does not exist */,
     ER_BUS_CANNOT_EXPAND_MESSAGE = 0x9042 /**< Expansion information for a compressed message is not available */,
@@ -396,27 +396,7 @@ typedef enum {
     ER_BUS_REMOVED_BY_BINDER_SELF = 0x9128 /**< The self-joined session member was removed by the binder */,
     ER_INVALID_CONFIG = 0x9129 /**< Invalid configuration item or combination of items detected */,
     ER_ABOUT_INVALID_ABOUTDATA_FIELD_VALUE = 0x912a /**< General error indicating the value given for an About Data field is invalid. */,
-    ER_ABOUT_INVALID_ABOUTDATA_FIELD_APPID_SIZE = 0x912b /**< Error indicating the AppId field is not a 128-bit bite array. */,
-    ER_BUS_TRANSPORT_ACCESS_DENIED = 0x912c /**< The transport denied the connection attempt because the application doesn't have the required permissions. */,
-    ER_INVALID_CERTIFICATE = 0x912d /**< Invalid certificate */,
-    ER_CERTIFICATE_NOT_FOUND = 0x912e /**< Certificate not found */,
-    ER_DUPLICATE_CERTIFICATE = 0x912f /**< Duplicate Certificate found */,
-    ER_UNKNOWN_CERTIFICATE = 0x9130 /**< Unknown Certificate */,
-    ER_MISSING_DIGEST_IN_CERTIFICATE = 0x9131 /**< Missing digest in certificate */,
-    ER_DIGEST_MISMATCH = 0x9132 /**< Digest mismatch */,
-    ER_DUPLICATE_KEY = 0x9133 /**< Duplicate key found */,
-    ER_NO_COMMON_TRUST = 0x9134 /**< No common trust anchor found */,
-    ER_MANIFEST_NOT_FOUND = 0x9135 /**< Permission manifest not found */,
-    ER_INVALID_CERT_CHAIN = 0x9136 /**< Invalid certificate chain */,
-    ER_NO_TRUST_ANCHOR = 0x9137 /**< No trust anchor */,
-    ER_INVALID_APPLICATION_STATE = 0x9138 /**< Invalid application state */,
-    ER_FEATURE_NOT_AVAILABLE = 0x9139 /**< Feature is not available */,
-    ER_KEY_STORE_ALREADY_INITIALIZED = 0x913a /**< Key store is already initialized */,
-    ER_KEY_STORE_ID_NOT_YET_SET = 0x913b /**< Key store ID is not yet set */,
-    ER_POLICY_NOT_NEWER = 0x913c /**< Installing permission policy not newer than existing policy */,
-    ER_MANIFEST_REJECTED = 0x913d /**< The manifest of the application was rejected. */,
-    ER_INVALID_CERTIFICATE_USAGE = 0x913e /**< The certificate extended key usage is not Alljoyn specific. */,
-    ER_INVALID_SIGNAL_EMISSION_TYPE = 0x913f /**< Attempt to send a signal with the wrong type. */
+    ER_ABOUT_INVALID_ABOUTDATA_FIELD_APPID_SIZE = 0x912b /**< Error indicating the AppId field is not a 128-bit bite array. */
 } QStatus;
 
 /**

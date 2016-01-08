@@ -100,31 +100,31 @@ class AuthListener {
         /**
          * Sets a requested password, pincode, or passphrase.
          *
-         * @param password  The password to set.
+         * @param pwd  The password to set.
          */
-        void SetPassword(const qcc::String& password) { this->pwd = password; mask |= CRED_PASSWORD; }
+        void SetPassword(const qcc::String& pwd) { this->pwd = pwd; mask |= CRED_PASSWORD; }
 
         /**
          * Sets a requested user name.
          *
-         * @param newUserName  The user name to set.
+         * @param userName  The user name to set.
          */
-        void SetUserName(const qcc::String& newUserName) { this->userName = newUserName; mask |= CRED_USER_NAME; }
+        void SetUserName(const qcc::String& userName) { this->userName = userName; mask |= CRED_USER_NAME; }
 
         /**
          * Sets a requested public key certificate chain. The certificates must be PEM encoded.
          *
-         * @param certificateChain  The certificate chain to set.
+         * @param certChain  The certificate chain to set.
          */
-        void SetCertChain(const qcc::String& certificateChain) { this->certChain = certificateChain; mask |= CRED_CERT_CHAIN; }
+        void SetCertChain(const qcc::String& certChain) { this->certChain = certChain; mask |= CRED_CERT_CHAIN; }
 
         /**
          * Sets a requested private key. The private key must be PEM encoded and may be encrypted. If
          * the private key is encrypted the passphrase required to decrypt it must also be supplied.
          *
-         * @param privateKey  The private key to set.
+         * @param pk  The private key to set.
          */
-        void SetPrivateKey(const qcc::String& privateKey) { this->pk = privateKey; mask |= CRED_PRIVATE_KEY; }
+        void SetPrivateKey(const qcc::String& pk) { this->pk = pk; mask |= CRED_PRIVATE_KEY; }
 
         /**
          * Sets a logon entry. For example for the Secure Remote Password protocol in RFC 5054, a
@@ -132,9 +132,9 @@ class AuthListener {
          * N:g:s:v where N,g,s, and v are ASCII encoded hexadecimal strings and are separated by
          * colons.
          *
-         * @param newLogonEntry  The logon entry to set.
+         * @param logonEntry  The logon entry to set.
          */
-        void SetLogonEntry(const qcc::String& newLogonEntry) { this->logonEntry = newLogonEntry; mask |= CRED_LOGON_ENTRY; }
+        void SetLogonEntry(const qcc::String& logonEntry) { this->logonEntry = logonEntry; mask |= CRED_LOGON_ENTRY; }
 
         /**
          * Sets an expiration time in seconds relative to the current time for the credentials. This value is optional and
@@ -142,15 +142,9 @@ class AuthListener {
          * keys based on the provided credentials are invalidated and a new authentication exchange will be required. If an
          * expiration is not set the default expiration time for the requested authentication mechanism is used.
          *
-         * The underlying key store will never expire credentials any sooner than MIN_EXPIRATION_DEFAULT seconds.
-         * It is valid to provide a smaller value for expirationSeconds here, but if it is smaller than
-         * MIN_EXPIRATION_DEFAULT, the actual expiration time will be MIN_EXPIRATION_DEFAULT seconds.
-         *
-         * @see KeyBlob::MIN_EXPIRATION_DEFAULT in <qcc/KeyBlob.h>
-         *
-         * @param expirationSeconds  The expiration time in seconds.
+         * @param expiration  The expiration time in seconds.
          */
-        void SetExpiration(uint32_t expirationSeconds) { this->expiration = expirationSeconds; mask |= CRED_EXPIRATION; }
+        void SetExpiration(uint32_t expiration) { this->expiration = expiration; mask |= CRED_EXPIRATION; }
 
         /**
          * Gets the password, pincode, or passphrase from this credentials instance.
@@ -332,7 +326,7 @@ class AuthListener {
     /**
      * Respond to a call to VerifyCredentialsAsync.
      *
-     * @param authContext    Context that was passed in the call out to VerifyCredentialsAsync.
+     * @param authContext    Context that was passed in the call out to RequestCredentialsAsync.
      * @param accept         Returns true to accept the credentials or false to reject it.
      *
      * @return   Returns ER_OK if the credential verification response was expected. Returns an error status if
@@ -365,90 +359,8 @@ class AuthListener {
      * @param success        true if the authentication was successful, otherwise false.
      */
     virtual void AuthenticationComplete(const char* authMechanism, const char* peerName, bool success) = 0;
-};
 
-/**
- * AuthListener that provides the default operations for ECDHE authentication
- * mechanisms.
- */
-class DefaultECDHEAuthListener : public AuthListener {
 
-  public:
-    /**
-     * Create an instance of AuthListener that provides the default operations
-     * for ECDHE authentication mechanisms.
-     * For ECDHE_NULL authentication mechanism, the RequestCredentials callback
-     *     returns true.
-     * For ECDHE_PSK authentication mechanism, the RequestCredentials callback
-     *     returns false.
-     * For ECDHE_ECDSA authentication mechanism, the RequestCredentials callback
-     *     returns true without providing any credential.
-     * This AuthListener is suitable to be used in Claimed application since
-     * the framework will provide the Identity certificate chain to the peer.
-     */
-    DefaultECDHEAuthListener();
-
-    /**
-     * Create an instance of AuthListener that provides the default operations
-     * for ECDHE authentication mechanisms.
-     * For ECDHE_NULL authentication mechanism, the RequestCredentials callback
-     *     returns true.
-     * For ECDHE_PSK authentication mechanism, the RequestCredentials callback
-     *     returns true using the provided psk.
-     * For ECDHE_ECDSA authentication mechanism, the RequestCredentials callback
-     *     returns true without providing any credential.
-     * This AuthListener is suitable to be used in Claimed application since
-     * the framework will provide the Identity certificate chain to the peer.
-     * @param[in] psk the pre-shared secret
-     * @param[in] pskSize the size of the pre-shared secret.  It must be at
-     *                    least 128 bits.
-     */
-    DefaultECDHEAuthListener(const uint8_t* psk, size_t pskSize);
-
-    virtual ~DefaultECDHEAuthListener()
-    {
-        delete [] psk;
-    }
-
-    /**
-     * @brief updates the preshared used by this DefaultECDHEAuthListener.
-     *
-     * This method allows to update the current set pre-shared secret (or set
-     * when it is not yet defined) or clear it by providing a NULL array.
-     *
-     * @param[in] psk the pre-shared secret or NULL.
-     * @param[in] pskSize the size of the pre-shared secret.  It must be at
-     *                    least 128 bits (pksSize >= 16) or 0 to clear the
-     *                    current set secret.
-     * @return ER_OK on success
-     */
-    virtual QStatus SetPSK(const uint8_t* psk, size_t pskSize);
-
-    /**
-     * @copydoc AuthListener::RequestCredentials
-     * @see AuthListener::RequestCredentials
-     */
-    virtual bool RequestCredentials(const char* authMechanism, const char* peerName, uint16_t authCount, const char* userName, uint16_t credMask, Credentials& credentials);
-
-    /**
-     * @copydoc AuthListener::AuthenticationComplete
-     * @see AuthListener::AuthenticationComplete
-     */
-    virtual void AuthenticationComplete(const char* authMechanism, const char* peerName, bool success);
-
-  private:
-    /**
-     * Assignment operator is private.
-     */
-    DefaultECDHEAuthListener& operator=(const DefaultECDHEAuthListener& other);
-
-    /**
-     * Copy constructor is private.
-     */
-    DefaultECDHEAuthListener(const DefaultECDHEAuthListener& other);
-
-    uint8_t* psk;
-    size_t pskSize;
 };
 
 }

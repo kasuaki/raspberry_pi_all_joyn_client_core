@@ -54,7 +54,7 @@ class AboutProxy : public ProxyBusObject {
     virtual ~AboutProxy();
 
     /**
-     * Get the ObjectDescription array for the specified bus name.
+     * Get the ObjectDescription array for specified bus name.
      *
      * @param[out] objectDesc Description of busName's remote objects.
      *
@@ -65,22 +65,15 @@ class AboutProxy : public ProxyBusObject {
     QStatus GetObjectDescription(MsgArg& objectDesc);
 
     /**
-     * Get the AboutData for the specified bus name for a requested language.
-     * The language tag will be matched against a set of supported languages
-     * by the remote object using the algorithm specified in RFC 4647
-     * section 3.4 to find the best matching language or use the default
-     * language if no match exists.  This algorithm requires that the
-     * "supported" languages be the least specific they can (e.g., "en" in
-     * order to match both "en" and "en-US" if requested), and the "requested"
-     * language be the most specific it can (e.g., "en-US" in order to match
-     * either "en-US" or "en" if supported).
+     * Get the AboutData  for specified bus name.
      *
-     * @param[in] languageTag The requested language.
-     * @param[out] data Reference of AboutData that is filled by the function.
+     * @param[in] languageTag is the language used to request the AboutData.
+     * @param[out] data is reference of AboutData that is filled by the function
      *
      * @return
      *    - ER_OK if successful.
-     *    - ER_BUS_REPLY_IS_ERROR_MESSAGE on unknown failure.
+     *    - ER_LANGUAGE_NOT_SUPPORTED if the language specified is not supported
+     *    - ER_BUS_REPLY_IS_ERROR_MESSAGE on unknown failure
      */
     QStatus GetAboutData(const char* languageTag, MsgArg& data);
 
@@ -92,6 +85,12 @@ class AboutProxy : public ProxyBusObject {
      * @return ER_OK on success
      */
     QStatus GetVersion(uint16_t& version);
+  private:
+
+    /**
+     *  pointer to  BusAttachment
+     */
+    ajn::BusAttachment* m_BusAttachment;
 };
 
 }

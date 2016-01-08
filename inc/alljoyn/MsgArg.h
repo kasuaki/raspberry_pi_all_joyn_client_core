@@ -228,8 +228,6 @@ typedef struct {
  * additional memory is allocated for an #ALLJOYN_STRING that references an existing const char*.
  * If a MsgArg is assigned the destination receives a copy of the contents of the source. The
  * Stabilize() methods can also be called to explicitly force contents of the MsgArg to be copied.
- *
- * See [Message argument or MsgArg](@ref msg_argument_or_msgarg)
  */
 class MsgArg {
     friend class _Message;
@@ -651,10 +649,10 @@ class MsgArg {
      * dynamically allocated. The #OwnsData flag is useful for freeing
      * dynamically allocated strings, byte arrays, etc,.
      *
-     * @param ownershipFlags  A logical or of the applicable ownership flags (OwnsArgs and OwnsData).
-     * @param deep            If true recursively sets the ownership flags on all MsgArgs owned by this MsgArg.
+     * @param flags  A logical or of the applicable ownership flags (OwnsArgs and OwnsData).
+     * @param deep   If true recursively sets the ownership flags on all MsgArgs owned by this MsgArg.
      */
-    void SetOwnershipFlags(uint8_t ownershipFlags, bool deep = false) { this->flags |= (ownershipFlags & (OwnsData | OwnsArgs)); if (deep) { SetOwnershipDeep(); } }
+    void SetOwnershipFlags(uint8_t flags, bool deep = false) { this->flags |= (flags & (OwnsData | OwnsArgs)); if (deep) { SetOwnershipDeep(); } }
 
     /**
      * Default constructor - arg instances start out invalid

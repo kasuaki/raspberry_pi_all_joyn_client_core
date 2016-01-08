@@ -25,6 +25,7 @@
 
 #include <qcc/platform.h>
 
+#include <assert.h>
 
 #include <qcc/String.h>
 #include <alljoyn/InterfaceDescription.h>
@@ -40,8 +41,6 @@ namespace ajn {
 /** @internal Forward references */
 class BusAttachment;
 class MethodTable;
-class SignalAuthorizationCallback;
-
 /// @endcond
 
 /**
@@ -140,28 +139,12 @@ class BusObject : public MessageReceiver {
      */
     const BusAttachment& GetBusAttachment() const
     {
-        QCC_ASSERT(bus);
+        assert(bus);
         return *bus;
     }
 
     /**
      * Send a signal.
-     *
-     * When using session-cast signals in a multi-point session, all members of
-     * the session will see the signal.
-     *
-     * When using security and session-cast signals in a multipoint session all
-     * members must be in an established trust relationship or a specific
-     * destination specified. Otherwise the signal will not been seen by any peers.
-     *
-     * When using security with policy and manifest (aka security 2.0) if the
-     * destination is not specified only the receiving peers policy will be used
-     * when deciding to trust the signal. The sending peer will not check its
-     * policy before sending the signal.
-     *
-     * There is no way to securely transmit sessionless signals since there is
-     * no way to establish a trust relationship between sending and receiving
-     * peers
      *
      * @param destination  The unique or well-known bus name or the signal recipient (NULL for broadcast signals)
      * @param sessionId    A unique SessionId for this AllJoyn session instance. The session this message is for.
@@ -228,7 +211,7 @@ class BusObject : public MessageReceiver {
     /**
      * Set the introspection description for this BusObject.
      *
-     * Note that when SetDescriptionTranslator is used the text in this method may
+     * Note that when SetDescriptoinTranslator is used the text in this method may
      * actually be a "lookup key". When generating the introspection the "text" is first
      * passed to the Translator where the key should be used to lookup the actual
      * description. In such a case, language should be set to "".
@@ -239,8 +222,8 @@ class BusObject : public MessageReceiver {
     void SetDescription(const char* language, const char* text);
 
     /**
-     * Set the Translator that provides this BusObject's ability to translate text such as
-     * introspection descriptions and localized about data in multiple languages.
+     * Set the Translator that provides this BusObject's introspection description
+     * in multiple languages.
      *
      * @param translator The Translator instance.
      */
@@ -309,13 +292,12 @@ class BusObject : public MessageReceiver {
      * @param msg      The method call message
      * @param args     The reply arguments (can be NULL)
      * @param numArgs  The number of arguments
-     * @param replyMsg Pointer to a Message object to receive a copy of the sent reply message (can be NULL if not needed)
      * @return
      *      - #ER_OK if successful
      *      - #ER_BUS_OBJECT_NOT_REGISTERED if bus object has not yet been registered
      *      - An error status otherwise
      */
-    QStatus MethodReply(const Message& msg, const MsgArg* args = NULL, size_t numArgs = 0, Message* replyMsg = NULL);
+    QStatus MethodReply(const Message& msg, const MsgArg* args = NULL, size_t numArgs = 0);
 
     /**
      * Reply to a method call with an error message.
@@ -323,26 +305,25 @@ class BusObject : public MessageReceiver {
      * @param msg              The method call message
      * @param error            The name of the error
      * @param errorMessage     An error message string
-     * @param replyMsg         Pointer to a Message object to receive a copy of the sent reply message (can be NULL if not needed)
      * @return
      *      - #ER_OK if successful
      *      - #ER_BUS_OBJECT_NOT_REGISTERED if bus object has not yet been registered
      *      - An error status otherwise
      */
-    QStatus MethodReply(const Message& msg, const char* error, const char* errorMessage = NULL, Message* replyMsg = NULL);
+    QStatus MethodReply(const Message& msg, const char* error, const char* errorMessage = NULL);
 
     /**
      * Reply to a method call with an error message.
      *
      * @param msg        The method call message
      * @param status     The status code for the error
-     * @param replyMsg   Pointer to a Message object to receive a copy of the sent reply message (can be NULL if not needed)
      * @return
      *      - #ER_OK if successful
      *      - #ER_BUS_OBJECT_NOT_REGISTERED if bus object has not yet been registered
      *      - An error status otherwise
      */
-    QStatus MethodReply(const Message& msg, QStatus status, Message* replyMsg = NULL);
+    QStatus MethodReply(const Message& msg, QStatus status);
+
 
     /**
      * Add an interface to this object. If the interface has properties this will also add the
@@ -452,12 +433,12 @@ class BusObject : public MessageReceiver {
      * introspection XML presented to remote nodes. Note that to DTD description and
      * the root element are not generated.
      *
-     * @param requestedLanguageTag      Language reguested for <description>'s. NULL for no descriptions.
-     * @param deep                      Include XML for all descendants rather than stopping at direct children.
-     * @param indent                    Number of characters to indent the XML
-     * @return                          Description of the object in AllJoyn introspection XML format
+     * @param languageTag   language reguested for <description>'s. NULL for no descriptions.
+     * @param deep     Include XML for all descendants rather than stopping at direct children.
+     * @param indent   Number of characters to indent the XML
+     * @return Description of the object in AllJoyn introspection XML format
      */
-    virtual qcc::String GenerateIntrospection(const char* requestedLanguageTag, bool deep = false, size_t indent = 0) const;
+    virtual qcc::String GenerateIntrospection(const char* languageTag, bool deep = false, size_t indent = 0) const;
 
     /**
      * Called by the message bus when the object has been successfully registered. The object can
@@ -584,7 +565,7 @@ class BusObject : public MessageReceiver {
      *      - #ER_OK if all the methods were added
      *      - #ER_BUS_NO_SUCH_INTERFACE is method can not be added because interface does not exist.
      */
-    QStatus DoRegistration(BusAttachment& busAttachment);
+    QStatus DoRegistration(BusAttachment& bus);
 
     /**
      * Returns true if this object implements the given interface.
@@ -651,20 +632,6 @@ class BusObject : public MessageReceiver {
      */
     const char* GetDescription(const char* toLanguage, qcc::String& buffer) const;
 
-    /**
-     * the internal method to send signal.
-     * @see Signal
-     */
-    QStatus SignalInternal(const char* destination,
-                           SessionId sessionId,
-                           const InterfaceDescription::Member& signal,
-                           const MsgArg* args = NULL,
-                           size_t numArgs = 0,
-                           uint16_t timeToLive = 0,
-                           uint8_t flags = 0,
-                           Message* msg = NULL,
-                           SignalAuthorizationCallback* authorizationCallback = NULL);
-
     struct Components;
     Components* components; /**< Internal components of this object */
 
@@ -689,7 +656,7 @@ class BusObject : public MessageReceiver {
     /** Default Description */
     qcc::String description;
 
-    /** Provides translation of text into other languages */
+    /** Provides descriptions in other languages */
     Translator* translator;
 };
 
