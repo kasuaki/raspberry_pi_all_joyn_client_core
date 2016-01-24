@@ -4,6 +4,7 @@
 
 #include <signal.h>
 #include <stdio.h>
+#include <time.h>
 #include <vector>
 
 #include <qcc/String.h>
@@ -18,7 +19,7 @@ using namespace std;
 using namespace qcc;
 using namespace ajn;
 
-// ƒ‹[ƒv—p.
+// ãƒ«ãƒ¼ãƒ—ç”¨.
 static volatile sig_atomic_t sigFlag = false;
 
 static void CDECL_CALL SigIntHandler(int sig)
@@ -29,7 +30,7 @@ static void CDECL_CALL SigIntHandler(int sig)
 
 static const char* INTERFACE_NAME = "org.alljoyn.SensorLightCamera.Sensor";
 static const char* SERVICE_NAME = "org.alljoyn.SensorLightCamera";
-static const char* SERVICE_PATH = "/";
+static const char* SERVICE_PATH = "/org/alljoyn/SensorLightCamera/Sensor";
 static const SessionPort SERVICE_PORT = 25;
 
 class MyBusObject : public BusObject {
@@ -46,6 +47,11 @@ class MyBusObject : public BusObject {
 	void SetSenseProp(bool _senseProp)
 	{
 		senseProp = _senseProp;
+	}
+
+	bool GetSenseProp()
+	{
+		return senseProp;
 	}
 
 	QStatus Get(const char* ifcName, const char* propName, MsgArg& val)
@@ -149,7 +155,8 @@ private:
 
 		return intf;
 	}
-public:
+
+	public:
 	SensorBus()
 	{
 		AllJoynInit();
@@ -195,12 +202,23 @@ public:
 
 	void SendSignal(bool ret)
 	{
+		bool senseProp = busObj->GetSenseProp();
+		if (senseProp == ret) 
+			return;
+
 		busObj->SetSenseProp(ret);
 
 		MsgArg* arg = new MsgArg(ALLJOYN_BOOLEAN);
 		arg->v_bool = ret;
 
-		printf("Send Signal(%d)\n", ret);
+		time_t timer;
+
+		/* ç¾åœ¨æ™‚åˆ»ã®å–å¾— */
+		time(&timer);
+
+		struct tm* localTime = localtime(&timer);
+
+		printf("Send Signal(%d): %02d:%02d:%02d\n", ret, localTime->tm_hour, localTime->tm_min, localTime->tm_sec);
 
 		busObj->Signal(NULL,							// NULL for broadcast signals.
 						0,								// For broadcast or sessionless signals, the sessionId must be 0.
@@ -212,7 +230,7 @@ public:
 		);
 	}
 };
-// SendSignalŒü‚¯ŠÖ”ƒ|ƒCƒ“ƒ^.
+// SendSignalå‘ã‘é–¢æ•°ãƒã‚¤ãƒ³ã‚¿.
 typedef void (SensorBus::*SendSignalPtr)(bool);
 
 class HumanSensor
@@ -220,11 +238,11 @@ class HumanSensor
 private:
 	const int pin_22 = 6;	   // rsp board pin:22
 
-	// SensorBus‚Éˆ—ˆÏ÷.
+	// SensorBusã«å‡¦ç†å§”è­².
 	SensorBus* bus;
 	SendSignalPtr fp;
 
-	// Ã“I‚©‚çƒ[ƒJƒ‹‚É•ÏX.
+	// é™çš„ã‹ã‚‰ãƒ­ãƒ¼ã‚«ãƒ«ã«å¤‰æ›´.
 	static HumanSensor* thisPtr;
 	static void staticSig()
 	{
@@ -232,7 +250,7 @@ private:
 	}
 	void sig()
 	{
-		printf("sig: %d \n", digitalRead(pin_22));
+		//printf("sig: %d \n", digitalRead(pin_22));
 		(bus->*fp)(digitalRead(pin_22));
 	}
 public:
@@ -241,10 +259,11 @@ public:
 	{
 		thisPtr = this;
 
-		wiringPiSetup();
+		if (wiringPiSetup() == -1)
+			printf("wiringPiSetupGpio failed");
 
 		pinMode(pin_22, INPUT);
-		pullUpDnControl(pin_22, PUD_UP);
+		pullUpDnControl(pin_22, PUD_DOWN);
 		wiringPiISR(pin_22, INT_EDGE_BOTH, &HumanSensor::staticSig);
 	}
 	~HumanSensor()
@@ -253,7 +272,7 @@ public:
 };
 HumanSensor* HumanSensor::thisPtr;
 
-// ƒƒCƒ“ˆ—.
+// ãƒ¡ã‚¤ãƒ³å‡¦ç†.
 int CDECL_CALL main(int argc, char** argv, char** envArg)
 {
 	QCC_UNUSED(argc);
@@ -263,7 +282,7 @@ int CDECL_CALL main(int argc, char** argv, char** envArg)
 	SensorBus* bus = new SensorBus();
 	HumanSensor* sensor = new HumanSensor(&SensorBus::SendSignal, bus);
 
-	// ctrl-có•t.
+	// ctrl-cå—ä»˜.
 	signal(SIGINT, SigIntHandler);
 
 	while (sigFlag == false) {
